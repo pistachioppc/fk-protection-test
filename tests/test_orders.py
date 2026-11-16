@@ -11,5 +11,6 @@ def test_empty():
 
 def test_vat():
     from orders import total_with_vat
+
     assert total_with_vat([100]) == 125.5
     assert total_with_vat([]) == 0
