@@ -1,3 +1,6 @@
+"""Toy order totals for the protection test."""
+
+
 def total(amounts):
     return sum(amounts)
 
