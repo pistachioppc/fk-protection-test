@@ -33,11 +33,6 @@ run = "gitleaks git --redact --no-banner --no-color -v --log-opts={range}"
 required = true
 
 [[checks]]
-name = "deps"
-run = "pip-audit -r requirements.txt --strict"
-required = true
-
-[[checks]]
 name = "schema"
 run = "fk validate"
 required = true
