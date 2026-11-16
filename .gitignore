@@ -1,0 +1,6 @@
+# >>> foundation (managed by fk; edit outside this block)
+.foundation/runs/
+.env
+.env.*
+!.env.example
+# <<< foundation

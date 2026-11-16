@@ -1,0 +1,37 @@
+# Managed by the foundation kit; `fk upgrade` updates it unless you edit it.
+# Changing this file is a control change (spec §5.3): the guard asks for the
+# human's label. Waive one finding with an [[exceptions]] entry in
+# foundation.toml (check = "secrets", id = the finding's fingerprint), which
+# `fk gate` passes to gitleaks; never with an allowlist here.
+
+title = "foundation kit"
+
+[extend]
+useDefault = true
+
+# A password or token inside a URL's user-info part (scheme, user, secret, host).
+[[rules]]
+id = "url-credential"
+description = "Credential in a URL user-info part"
+regex = '''(?i)\b[a-z][a-z0-9+.-]{1,20}://[^\s:/@'"<>]{1,128}:([^\s/@'"<>]{3,256})@[a-z0-9][a-z0-9.-]*'''
+secretGroup = 1
+keywords = ["://"]
+
+[[rules.allowlists]]
+description = "placeholders, not credentials"
+regexTarget = "secret"
+regexes = ['''(?i)^(\$\{?[a-z_][a-z0-9_]*\}?|<[^>]*>|\{[^}]*\}|\*+|x+|\.+|password|secret|changeme|change-me)$''']
+
+# A credential passed as a query parameter (an API key, token, secret, password
+# or session key named in the query string).
+[[rules]]
+id = "url-query-credential"
+description = "Credential in a URL query parameter"
+regex = '''(?i)[?&](?:api[_-]?key|access[_-]?token|auth[_-]?token|token|secret|client[_-]?secret|password|passwd|session[_-]?key|session[_-]?id)=([^\s&#'"<>]{12,})'''
+secretGroup = 1
+keywords = ["key=", "token=", "secret=", "password=", "passwd=", "id="]
+
+[[rules.allowlists]]
+description = "placeholders, not credentials"
+regexTarget = "secret"
+regexes = ['''(?i)^(\$\{?[a-z_][a-z0-9_]*\}?|<[^>]*>|\{[^}]*\}|\*+|x+|your[_-].*|changeme.*)$''']

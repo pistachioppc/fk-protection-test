@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Task front matter",
+  "type": "object",
+  "required": ["id", "title", "status", "created", "updated"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "pattern": "^T-[0-9]{4,}$"},
+    "title": {"type": "string", "minLength": 1},
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "ready", "in_progress", "review", "accepted", "blocked", "cancelled"]
+    },
+    "blocked_from": {
+      "type": "string",
+      "enum": ["proposed", "ready", "in_progress", "review"]
+    },
+    "owner": {"type": "string"},
+    "reviewer": {"type": "string"},
+    "risk": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "branch": {"type": "string"},
+    "pr": {"type": "integer", "minimum": 1},
+    "created": {"format": "date"},
+    "updated": {"format": "date"}
+  }
+}

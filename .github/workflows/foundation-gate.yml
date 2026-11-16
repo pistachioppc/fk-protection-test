@@ -1,0 +1,116 @@
+# Managed by the foundation kit (spec §5.3, §7). Edits are kept on upgrade but
+# reported as a conflict; change the kit, not this file.
+#
+# foundation/gate runs `fk gate` on the PR's merge result. It runs PR code, so
+# it has read-only contents and no secrets. Actions are pinned by commit SHA and
+# gitleaks by version and SHA-256.
+name: foundation-gate
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundation-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  GITLEAKS_VERSION: "8.30.1"
+  GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+  RUFF_VERSION: "0.17.3"
+  PIP_AUDIT_VERSION: "2.10.1"
+  PYTEST_VERSION: "8.4.2"
+
+jobs:
+  gate:
+    name: foundation/gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out the merge result
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Read the stack from foundation.toml
+        id: stack
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import tomllib
+          with open("foundation.toml", "rb") as fh:
+              stack = tomllib.load(fh)["project"]["stack"]
+          if stack not in ("python", "node"):
+              raise SystemExit(f"unknown [project].stack {stack!r}")
+          print(f"stack={stack}")
+          PY
+
+      - name: Set up Node
+        if: steps.stack.outputs.stack == 'node'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      # The project's own dependencies first. The check tools below are added
+      # to PATH after them, so a dependency cannot shadow ruff, pip-audit,
+      # gitleaks or fk with a script that exits 0. pytest has to share the
+      # project's environment; a PR's own tests and conftest are PR code anyway.
+      - name: Install the project (Python)
+        if: steps.stack.outputs.stack == 'python'
+        run: |
+          set -euo pipefail
+          for req in requirements.txt requirements-dev.txt; do
+            if [ -f "$req" ]; then python -m pip install --quiet -r "$req"; fi
+          done
+          python -m pip show --quiet pytest 2>/dev/null || python -m pip install --quiet "pytest==${PYTEST_VERSION}"
+
+      - name: Install the project (Node)
+        if: steps.stack.outputs.stack == 'node'
+        run: npm ci
+
+      - name: Install the check tools (pinned)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/bin" gitleaks
+
+          shopt -s nullglob
+          wheels=(.foundation/vendor/foundation_kit-*.whl)
+          if [ "${#wheels[@]}" -ne 1 ]; then
+            echo "::error::expected exactly one vendored fk wheel, found ${#wheels[@]}"
+            exit 1
+          fi
+          python -m venv "$RUNNER_TEMP/tools"
+          "$RUNNER_TEMP/tools/bin/python" -m pip install --quiet --no-deps --no-index "${wheels[0]}"
+          if [ "${{ steps.stack.outputs.stack }}" = python ]; then
+            "$RUNNER_TEMP/tools/bin/python" -m pip install --quiet \
+              "ruff==${RUFF_VERSION}" "pip-audit==${PIP_AUDIT_VERSION}"
+            ln -s "$RUNNER_TEMP/tools/bin/ruff" "$RUNNER_TEMP/tools/bin/pip-audit" "$RUNNER_TEMP/bin/"
+          fi
+          ln -s "$RUNNER_TEMP/tools/bin/fk" "$RUNNER_TEMP/bin/fk"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: fk gate
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: fk gate --range "${BASE_SHA}..HEAD"
+
+      - name: Upload the gate report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: foundation-gate-report
+          path: .foundation/runs/
+          if-no-files-found: warn
+          retention-days: 30

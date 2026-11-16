@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "foundation.toml",
+  "type": "object",
+  "required": ["project", "agents", "github", "checks"],
+  "additionalProperties": false,
+  "properties": {
+    "project": {
+      "type": "object",
+      "required": ["name", "stack", "default_branch"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "stack": {"type": "string", "enum": ["python", "node"]},
+        "default_branch": {"type": "string", "minLength": 1},
+        "profile": {"type": "string", "enum": ["standard", "high"]}
+      }
+    },
+    "agents": {
+      "type": "object",
+      "required": ["builder", "reviewer"],
+      "additionalProperties": false,
+      "properties": {
+        "builder": {"type": "string", "enum": ["claude", "codex", "manual"]},
+        "reviewer": {"type": "string", "enum": ["claude", "codex", "manual"]}
+      }
+    },
+    "github": {
+      "type": "object",
+      "required": ["human", "agent"],
+      "additionalProperties": false,
+      "properties": {
+        "human": {"type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$"},
+        "agent": {"type": "string", "pattern": "^$|^[A-Za-z0-9][A-Za-z0-9-]*(\\[bot\\])?$"}
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "run", "required"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+          "run": {"type": "string", "minLength": 1},
+          "required": {"type": "boolean"},
+          "timeout": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": {"type": "array", "items": {"type": "string", "minLength": 1}}
+    },
+    "exceptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["check", "id", "owner", "reason", "expires"],
+        "additionalProperties": false,
+        "properties": {
+          "check": {"type": "string", "minLength": 1},
+          "id": {"type": "string", "minLength": 1},
+          "owner": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "expires": {"format": "date"}
+        }
+      }
+    }
+  }
+}

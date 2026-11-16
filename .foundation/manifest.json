@@ -1,0 +1,81 @@
+{
+  "kit_version": "0.1.0.dev0",
+  "files": {
+    ".env.example": {
+      "class": "seeded",
+      "sha256": "7be29ac09e0f5cd7e8d7a56e58a1af2a3a6e702f6aba61b48e042d0f3bc43f12"
+    },
+    ".foundation/schemas/config.schema.json": {
+      "class": "managed",
+      "sha256": "a68ba86d201d1cacd41b15f92d2afd6006662f256f173705bca45cf90d7676ca"
+    },
+    ".foundation/schemas/decision.schema.json": {
+      "class": "managed",
+      "sha256": "99cd4a6aa47d601f7293236cdec046175d64abed2a4b5645066d6dc78af0061f"
+    },
+    ".foundation/schemas/review.schema.json": {
+      "class": "managed",
+      "sha256": "82f4e34fb87d2b57ce5499f14215a24b097505d297694dbec8f94fefcc478611"
+    },
+    ".foundation/schemas/task.schema.json": {
+      "class": "managed",
+      "sha256": "2e9a7d44f4d1bf373a1a890a982c80bd4f23531d518225570644fb195c4e96c2"
+    },
+    ".foundation/vendor/foundation_kit-0.1.0.dev0-py3-none-any.whl": {
+      "class": "managed",
+      "sha256": "f63a0b35391be377eb00793bb672259917932722041c0dd508d0c38a1ca9d9f4"
+    },
+    ".github/workflows/foundation-gate.yml": {
+      "class": "managed",
+      "sha256": "ba3ec79be6423261b363719bc733af025844b9b9b2c615846e620c57f3947d09"
+    },
+    ".github/workflows/foundation-guard.yml": {
+      "class": "managed",
+      "sha256": "9251795a04fe57b5be8f07e749d1e645b003ca1a4d9dd3d52e977d5beed3ec91"
+    },
+    ".gitignore": {
+      "class": "block",
+      "sha256": "59a911feb1ab82b2cff69a489df884bd4103fbe846ef5c154fee0d5b9276b35a"
+    },
+    ".gitleaks.toml": {
+      "class": "managed",
+      "sha256": "7561c7ea3a82cd5f508a5e01840b1061134e05b35d3178054df08b15bfb59482"
+    },
+    "AGENTS.md": {
+      "class": "seeded",
+      "sha256": "ff095b7b9a53a748449cc5db43e7bfe6bc4c48dae214fff0476c1090a658b290"
+    },
+    "CLAUDE.md": {
+      "class": "seeded",
+      "sha256": "336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49"
+    },
+    "docs/ARCHITECTURE.md": {
+      "class": "seeded",
+      "sha256": "ea4057a2c98f4472e450299f1a2c4cda0ce9c39a2f487a5981147c409b4a1606"
+    },
+    "docs/DECISIONS.md": {
+      "class": "seeded",
+      "sha256": "562b24a58cb3ad349d8e289854446e5a54d262fa83023b893a7f1191c77319a8"
+    },
+    "docs/HANDOVER.md": {
+      "class": "seeded",
+      "sha256": "2becbb6ef36311a7a395dd8a896b209f7c4076355d836a37637fc9f48c7355b7"
+    },
+    "docs/SECURITY.md": {
+      "class": "seeded",
+      "sha256": "18e633fc8f7c5e01ec913e61d3e8f627e12c6f095957f95638df0ed7d5c79a35"
+    },
+    "docs/decisions/.gitkeep": {
+      "class": "seeded",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "foundation.toml": {
+      "class": "seeded",
+      "sha256": "a10cc9661712e3d11fde4f7fe5b71851614339cfc8661a49ae2d633af13ba8dd"
+    },
+    "tasks/README.md": {
+      "class": "seeded",
+      "sha256": "0213ac2fce27a8abfc17ef9a0c8aff4c1b8f6d84faa168936cbbd19be2332013"
+    }
+  }
+}

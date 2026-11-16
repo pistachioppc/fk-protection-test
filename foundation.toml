@@ -1,0 +1,51 @@
+[project]
+name = "change-me"
+stack = "python"
+default_branch = "main"
+profile = "standard"         # standard | high
+
+[agents]
+builder = "claude"           # claude | codex | manual
+reviewer = "codex"
+
+[github]
+human = "change-me"          # the only login whose approval counts
+agent = ""                   # GitHub App login; empty = unseparated mode
+
+[[checks]]
+name = "tests"
+run = "pytest -q"
+required = true
+
+[[checks]]
+name = "lint"
+run = "ruff check ."
+required = true
+
+[[checks]]
+name = "format"
+run = "ruff format --check ."
+required = true
+
+[[checks]]
+name = "secrets"
+run = "gitleaks git --redact --no-banner --no-color -v --log-opts={range}"
+required = true
+
+[[checks]]
+name = "deps"
+run = "pip-audit -r requirements.txt --strict"
+required = true
+
+[[checks]]
+name = "schema"
+run = "fk validate"
+required = true
+
+[risk]
+auth = ["**/auth/**", "**/login*"]
+payment = ["**/payment*", "**/billing*"]
+migration = ["**/migrations/**"]
+external-write = ["**/clients/**", "**/integrations/**"]
+secrets = [".env*", "**/*credential*"]
+control = [".github/**", "foundation.toml", ".gitleaks.toml", ".foundation/**"]

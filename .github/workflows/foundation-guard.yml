@@ -1,0 +1,198 @@
+# Managed by the foundation kit (spec §5.1, §5.3). Edits are kept on upgrade but
+# reported as a conflict; change the kit, not this file.
+#
+# foundation/guard runs on pull_request_target, so this definition comes from
+# the default branch and a PR cannot weaken it. It never checks out or runs PR
+# code and never imports the vendored fk: the check is the inline script below,
+# standard-library Python only, talking to the GitHub API. It fails when
+#   (a) the PR author is not [github].agent (skipped in unseparated mode), or
+#   (b) a control path changed and the change is not approved: the label
+#       control-change-approved must be on the PR, last applied by
+#       [github].human, and [github].human's latest review must approve the
+#       head sha. The human approves first, then labels (the label re-runs
+#       the guard; a review does not).
+# Every push (synchronize) also removes the label, as hygiene; the sha-bound
+# review is what makes an old approval useless for a new push.
+# foundation.toml is read from the base commit, never from the PR.
+name: foundation-guard
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write # only to remove the label on a new push
+
+concurrency:
+  group: foundation-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: foundation/guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check author and control paths
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'FOUNDATION_GUARD'
+          import base64
+          import json
+          import os
+          import re
+          import sys
+          import tomllib
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          LABEL = "control-change-approved"
+          # The floor (spec §5.3): [risk].control can add to it, never remove.
+          FLOOR = [
+              ".github/**", "CODEOWNERS", "docs/CODEOWNERS",
+              "foundation.toml", ".gitleaks.toml", ".foundation/**",
+              "**/pyproject.toml", "**/pytest.ini", "**/setup.cfg",
+              "**/ruff.toml", "**/.ruff.toml", "**/package.json",
+              "**/eslint.config.*", "**/.eslintrc", "**/.eslintrc.*",
+          ]
+          API = os.environ.get("GITHUB_API_URL", "https://api.github.com").rstrip("/")
+          REPO = os.environ["GITHUB_REPOSITORY"]
+          TOKEN = os.environ["GITHUB_TOKEN"]
+          problems, notes = [], []
+
+
+          class ApiError(Exception):
+              pass
+
+
+          def api(method, path, ok=(200,)):
+              req = urllib.request.Request(API + path, method=method, headers={
+                  "Authorization": f"Bearer {TOKEN}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "foundation-guard",
+              })
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      status, body = resp.status, resp.read()
+              except urllib.error.HTTPError as exc:
+                  status, body = exc.code, exc.read()
+              except (urllib.error.URLError, TimeoutError) as exc:
+                  raise ApiError(f"{method} {path}: {exc}") from exc
+              if status not in ok:
+                  raise ApiError(f"{method} {path}: HTTP {status}")
+              return status, (json.loads(body) if body else None)
+
+
+          def pages(path):
+              out, page = [], 1
+              sep = "&" if "?" in path else "?"
+              while True:
+                  _, items = api("GET", f"{path}{sep}per_page=100&page={page}")
+                  out.extend(items)
+                  if len(items) < 100:
+                      return out
+                  page += 1
+
+
+          def glob_re(pattern):
+              out, i = "", 0
+              while i < len(pattern):
+                  if pattern.startswith("**/", i):
+                      out, i = out + "(?:.*/)?", i + 3
+                  elif pattern.startswith("**", i):
+                      out, i = out + ".*", i + 2
+                  elif pattern[i] == "*":
+                      out, i = out + "[^/]*", i + 1
+                  elif pattern[i] == "?":
+                      out, i = out + "[^/]", i + 1
+                  else:
+                      out, i = out + re.escape(pattern[i]), i + 1
+              return re.compile(out + r"\Z")
+
+
+          def same(a, b):
+              return bool(a) and bool(b) and a.casefold() == b.casefold()
+
+
+          def main():
+              with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as fh:
+                  event = json.load(fh)
+              action, pr = event.get("action"), event["pull_request"]
+              number, head, base = pr["number"], pr["head"]["sha"], pr["base"]["sha"]
+
+              # Configuration from the base commit: the PR cannot rewrite who counts.
+              _, meta = api("GET", f"/repos/{REPO}/contents/foundation.toml?ref={base}")
+              config = tomllib.loads(base64.b64decode(meta["content"]).decode("utf-8"))
+              github = config.get("github", {})
+              human, agent = github.get("human", ""), github.get("agent", "")
+              if not human or human == "change-me":
+                  problems.append("[github].human is not set in foundation.toml on the base branch")
+              extra = config.get("risk", {}).get("control", [])
+              control = [glob_re(p) for p in FLOOR + [p for p in extra if isinstance(p, str)]]
+
+              # (a) Author.
+              author = pr["user"]["login"]
+              if not agent:
+                  notes.append("ACCEPTANCE: SELF-MERGE (not separated): [github].agent is empty")
+              elif not same(author, agent):
+                  problems.append(f"PR author {author} is not the agent identity {agent} "
+                                  "(an App's login ends in [bot])")
+
+              # A new push makes any earlier approval stale.
+              if action == "synchronize":
+                  api("DELETE", f"/repos/{REPO}/issues/{number}/labels/{LABEL}", ok=(200, 404))
+                  notes.append(f"new push: label {LABEL} removed")
+
+              # (b) Control paths.
+              files = pages(f"/repos/{REPO}/pulls/{number}/files")
+              if len(files) != pr.get("changed_files", len(files)):
+                  problems.append(f"listed {len(files)} changed files, the PR has "
+                                  f"{pr.get('changed_files')}: cannot rule out a control change")
+              paths = set()
+              for f in files:
+                  paths.add(f["filename"])
+                  if f.get("previous_filename"):
+                      paths.add(f["previous_filename"])
+              touched = sorted(p for p in paths if any(r.match(p) for r in control))
+              if touched:
+                  notes.append("control paths changed: " + ", ".join(touched))
+                  labels = [l["name"] for l in pages(f"/repos/{REPO}/issues/{number}/labels")]
+                  applied = [e for e in pages(f"/repos/{REPO}/issues/{number}/events")
+                             if e.get("event") == "labeled" and (e.get("label") or {}).get("name") == LABEL]
+                  # The human's latest deciding review must approve this exact
+                  # head sha: a value the agent cannot forge, unlike commit dates.
+                  verdicts = [r for r in pages(f"/repos/{REPO}/pulls/{number}/reviews")
+                              if same((r.get("user") or {}).get("login", ""), human)
+                              and r.get("state") in ("APPROVED", "CHANGES_REQUESTED", "DISMISSED")]
+                  if LABEL not in labels or not applied:
+                      problems.append(f"control change needs the label {LABEL} from {human}")
+                  else:
+                      by = (applied[-1].get("actor") or {}).get("login", "")
+                      if not same(by, human):
+                          problems.append(f"label {LABEL} was applied by {by}, not {human}")
+                      elif not verdicts or verdicts[-1]["state"] != "APPROVED" \
+                              or verdicts[-1].get("commit_id") != head:
+                          problems.append(f"control change needs {human}'s approving review of "
+                                          f"{head[:12]}, then the label {LABEL}")
+                      else:
+                          notes.append(f"control change approved by {by} for {head[:12]}")
+
+
+          try:
+              main()
+          except (ApiError, KeyError, ValueError, tomllib.TOMLDecodeError) as exc:
+              problems.append(f"guard could not finish: {exc!r}")
+
+          lines = notes + [f"FAIL: {p}" for p in problems]
+          lines.append("foundation/guard: " + ("FAIL" if problems else "PASS"))
+          print("\n".join(lines))
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write("\n".join(f"- {l}" for l in lines) + "\n")
+          sys.exit(1 if problems else 0)
+          FOUNDATION_GUARD
