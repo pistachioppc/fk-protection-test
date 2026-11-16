@@ -1,5 +1,5 @@
 [project]
-name = "change-me"
+name = "fk-protection-test"
 stack = "python"
 default_branch = "main"
 profile = "standard"         # standard | high
@@ -9,8 +9,8 @@ builder = "claude"           # claude | codex | manual
 reviewer = "codex"
 
 [github]
-human = "change-me"          # the only login whose approval counts
-agent = ""                   # GitHub App login; empty = unseparated mode
+human = "pistachioppc"
+agent = "fastcreativestudio-foundation-kit[bot]"
 
 [[checks]]
 name = "tests"
